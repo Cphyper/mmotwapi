@@ -35,25 +35,32 @@ app.add_middleware(
 )
 
 # Fetch API_KEY from environment variables
-API_KEY = os.getenv("API_KEY", "16546sw60520e19st")  # Replace with a strong default or leave as is
+API_KEY = os.getenv("API_KEY", "your-default-api-key")  # Replace with a strong default or leave as is
 
 # Pydantic Models
 
+class Message(BaseModel):
+    role: str
+    content: str
+
 class ChatRequest(BaseModel):
-    user_input: str
-    session_id: Optional[str] = None  # Optional field for session tracking
+    model: str
+    messages: List[Message]
+    temperature: Optional[float] = 0.7
+
+class Choice(BaseModel):
+    message: Message
 
 class ChatResponse(BaseModel):
-    response: str
-    metadata: Optional[dict] = None  # Optional metadata, e.g., timestamp, session_id
+    choices: List[Choice]
 
-# Sample Function to Generate Response
+# Function to Generate Response (Placeholder for Image Analysis)
 def generate_response(user_input: str, session_id: Optional[str] = None) -> str:
     """
-    Replace this function with your actual ChatGPT model inference logic.
+    Replace this function with your actual image analysis logic.
     For demonstration, it simply echoes the user input.
     """
-    # TODO: Integrate your ChatGPT model or any other AI model here
+    # TODO: Integrate your image analysis model or any other AI model here
     response = f"Echo: {user_input}"
     return response
 
@@ -70,18 +77,33 @@ def chat_endpoint(chat_request: ChatRequest, x_api_key: str = Header(..., alias=
         raise HTTPException(status_code=403, detail="Forbidden: Invalid API Key")
 
     try:
+        # Extract user message from messages list
+        user_message = ""
+        for msg in chat_request.messages:
+            if msg.role.lower() == "user":
+                user_message = msg.content
+                break
+
+        if not user_message:
+            raise HTTPException(status_code=400, detail="No user message found in the request.")
+
         # Generate response using the provided user input
-        response_text = generate_response(chat_request.user_input, chat_request.session_id)
-        
-        # Prepare metadata
-        metadata = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "session_id": chat_request.session_id or "N/A"
-        }
-        
-        # Return the response and metadata
-        return ChatResponse(response=response_text, metadata=metadata)
-    
+        response_text = generate_response(user_message)
+
+        # Construct the response in OpenAI's format
+        response = ChatResponse(
+            choices=[
+                Choice(
+                    message=Message(
+                        role="assistant",
+                        content=response_text
+                    )
+                )
+            ]
+        )
+
+        return response
+
     except Exception as e:
         # Handle any unexpected errors
         raise HTTPException(status_code=500, detail=f"Server Error: {str(e)}")
