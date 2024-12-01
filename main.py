@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 import os
 from dotenv import load_dotenv
