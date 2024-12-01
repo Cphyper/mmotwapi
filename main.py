@@ -7,6 +7,7 @@ from datetime import datetime
 import os
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
+import requests
 
 # Load environment variables from .env file
 load_dotenv()
@@ -20,10 +21,9 @@ app = FastAPI(
 # CORS Configuration
 origins = [
     "https://chatgpt.com/g/g-674ca726c78c8191a3ca4baede9712a6-dress-to-impress",  # Replace with your GoDaddy-hosted app domain
-    "http://chatgpt.com/g/g-674ca726c78c8191a3ca4baede9712a6-dress-to-impress,
+    "http://chatgpt.com/g/g-674ca726c78c8191a3ca4baede9712a6-dress-to-impress",
     "https://www.chatgpt.com/g/g-674ca726c78c8191a3ca4baede9712a6-dress-to-impress",
     "http://www.chatgpt.com/g/g-674ca726c78c8191a3ca4baede9712a6-dress-to-impress",
-    # Add more origins if necessary
 ]
 
 app.add_middleware(
@@ -35,7 +35,7 @@ app.add_middleware(
 )
 
 # Fetch API_KEY from environment variables
-API_KEY = os.getenv("API_KEY", "your-default-api-key")  # Replace with a strong default or leave as is
+API_KEY = os.getenv("API_KEY", "16546sw60520e19st")  # Replace with a strong default or leave as is
 
 # Pydantic Models
 
@@ -54,15 +54,22 @@ class Choice(BaseModel):
 class ChatResponse(BaseModel):
     choices: List[Choice]
 
-# Function to Generate Response (Placeholder for Image Analysis)
+# Function to Generate Response
 def generate_response(user_input: str, session_id: Optional[str] = None) -> str:
     """
-    Replace this function with your actual image analysis logic.
-    For demonstration, it simply echoes the user input.
+    Calls the GPT model API hosted at your specified endpoint.
     """
-    # TODO: Integrate your image analysis model or any other AI model here
-    response = f"Echo: {user_input}"
-    return response
+    gpt_api_url = "https://chatgpt.com/g/g-674ca726c78c8191a3ca4baede9712a6-dress-to-impress"  # Replace with your GPT API URL
+    headers = {"Authorization": f"Bearer {API_KEY}"}
+    payload = {"input": user_input, "session_id": session_id}
+
+    try:
+        response = requests.post(gpt_api_url, headers=headers, json=payload)
+        response.raise_for_status()  # Raise an HTTPError for bad responses
+        data = response.json()
+        return data.get("output", "No response received from GPT.")
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Error calling GPT API: {str(e)}")
 
 # API Endpoint
 
