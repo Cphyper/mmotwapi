@@ -1,5 +1,3 @@
-# main.py
-
 from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional, List
@@ -35,7 +33,7 @@ app.add_middleware(
 )
 
 # Fetch API_KEY from environment variables
-API_KEY = os.getenv("API_KEY", "16546sw60520e19st")  # Replace with a strong default or leave as is
+API_KEY = os.getenv("API_KEY", "your-default-api-key")  # Replace with a strong default or leave as is
 
 # Pydantic Models
 
