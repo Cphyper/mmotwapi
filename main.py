@@ -58,7 +58,7 @@ def generate_response(user_input: str, session_id: Optional[str] = None) -> str:
     """
     Calls the GPT model API hosted at your specified endpoint.
     """
-    gpt_api_url = "https://mmotwapi.onrender.com"  # Replace with your GPT API URL
+    gpt_api_url = "https://mmotwapi.onrender.com/chat"  # Replace with your GPT API URL
     headers = {"Authorization": f"Bearer {API_KEY}"}
     payload = {"input": user_input, "session_id": session_id}
 
