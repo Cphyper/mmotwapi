@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 import os
 from dotenv import load_dotenv
@@ -16,7 +16,6 @@ app = FastAPI(
     description="A FastAPI application that mimics ChatGPT functionality.",
     version="1.0.0",
 )
-
 # CORS Configuration
 origins = [
     "https://chat.openai.com/g/g-674ca726c78c8191a3ca4baede9712a6-dress-to-impress",  # Replace with your GoDaddy-hosted app domain
@@ -39,13 +38,15 @@ API_KEY = os.getenv("API_KEY", "your-default-api-key")  # Replace with a strong 
 
 # Pydantic Models
 
-class ChatRequest(BaseModel):
-    user_input: str
-    session_id: Optional[str] = None  # Optional field for session tracking
+class Message(BaseModel):
+    role: str
+    content: str
+
+class Choice(BaseModel):
+    message: Message
 
 class ChatResponse(BaseModel):
-    response: str
-    metadata: Optional[dict] = None  # Optional metadata, e.g., timestamp, session_id
+    choices: List[Choice]
 
 # Sample Function to Generate Response
 def generate_response(user_input: str, session_id: Optional[str] = None) -> str:
@@ -60,7 +61,7 @@ def generate_response(user_input: str, session_id: Optional[str] = None) -> str:
 # API Endpoint
 
 @app.post("/chat", response_model=ChatResponse)
-def chat_endpoint(chat_request: ChatRequest, x_api_key: str = Header(...)):
+def chat_endpoint(chat_request: dict, x_api_key: str = Header(...)):
     """
     Chat endpoint that processes user input and returns a response.
     Requires a valid API key in the 'x-api-key' header.
@@ -70,18 +71,23 @@ def chat_endpoint(chat_request: ChatRequest, x_api_key: str = Header(...)):
         raise HTTPException(status_code=403, detail="Forbidden: Invalid API Key")
 
     try:
-        # Generate response using the provided user input
-        response_text = generate_response(chat_request.user_input, chat_request.session_id)
-        
-        # Prepare metadata
-        metadata = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "session_id": chat_request.session_id or "N/A"
-        }
-        
-        # Return the response and metadata
-        return ChatResponse(response=response_text, metadata=metadata)
-    
+        user_input = chat_request.get("messages", [{}])[1].get("content", "")
+        response_text = generate_response(user_input)
+
+        # Construct the response in OpenAI's format
+        response = ChatResponse(
+            choices=[
+                Choice(
+                    message=Message(
+                        role="assistant",
+                        content=response_text
+                    )
+                )
+            ]
+        )
+
+        return response
+
     except Exception as e:
         # Handle any unexpected errors
         raise HTTPException(status_code=500, detail=f"Server Error: {str(e)}")
