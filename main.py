@@ -65,7 +65,7 @@ def generate_response(user_input: str, session_id: Optional[str] = None) -> str:
     Calls the GPT model API hosted at your specified endpoint.
     """
     gpt_api_url = "https://mmotwapi.onrender.com"  # Replace with your FastAPI Render URL
-    headers = {"x-api-key": API_KEY, "Content-Type": "application/json"}
+    headers = {"x-api-key": 16546sw60520e19st, "Content-Type": "application/json"}
     payload = {
         "model": "gpt-4",
         "messages": [
