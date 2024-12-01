@@ -1,11 +1,16 @@
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import Optional, List
 import os
+import json
+import base64
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 import requests
 import logging
+from google.cloud import vision
+from google.oauth2 import service_account
+
 
 # Load environment variables from .env file
 load_dotenv()
