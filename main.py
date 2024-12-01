@@ -37,7 +37,7 @@ app.add_middleware(
 )
 
 # Fetch API_KEY from environment variables
-API_KEY = os.getenv("API_KEY", "your-default-api-key")  # Replace with your actual API key
+API_KEY = os.getenv("API_KEY", "16546sw60520e19st")  # Replace with your actual API key
 
 # Pydantic Models
 class Message(BaseModel):
