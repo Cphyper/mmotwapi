@@ -19,10 +19,10 @@ app = FastAPI(
 
 # CORS Configuration
 origins = [
-    "https://jlmhypermedia.com/mmotwapi,  # Replace with your GoDaddy-hosted app domain
-    "http://jlmhypermedia.com/mmotwapi",
-    "https://www.jlmhypermedia.com/mmotwapi",
-    "http://www.jlmhypermedia.com/mmotwapi",
+    "https://chat.openai.com/g/g-674ca726c78c8191a3ca4baede9712a6-dress-to-impress",  # Replace with your GoDaddy-hosted app domain
+    "http://chat.openai.com/g/g-674ca726c78c8191a3ca4baede9712a6-dress-to-impress",
+    "https://www.chat.openai.com/g/g-674ca726c78c8191a3ca4baede9712a6-dress-to-impress",
+    "http://www.chat.openai.com/g/g-674ca726c78c8191a3ca4baede9712a6-dress-to-impress",
     # Add more origins if necessary
 ]
 
