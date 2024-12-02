@@ -1,17 +1,13 @@
-from fastapi import FastAPI, HTTPException, Header, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional, List
 import os
-import json
-import base64
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 import requests
 import logging
-from google.cloud import vision
-from google.oauth2 import service_account
 
-# Load environment variables from .env file if exists (optional for local testing)
+# Load environment variables from .env file
 load_dotenv()
 
 # Configure logging
@@ -41,79 +37,39 @@ app.add_middleware(
 )
 
 # Fetch API_KEY from environment variables
-API_KEY = os.getenv("API_KEY", "16546sw60520e19st")  # Replace with your actual API key
-
-# Initialize Google Vision Client with credentials from environment variables
-def get_vision_client():
-    service_account_info = os.getenv("GOOGLE_CLOUD_KEY_JSON")
-    if not service_account_info:
-        raise Exception("Google Cloud service account key not found in environment variables.")
-    try:
-        decoded_key = base64.b64decode(service_account_info)
-        service_account_dict = json.loads(decoded_key)
-        credentials = service_account.Credentials.from_service_account_info(service_account_dict)
-        return vision.ImageAnnotatorClient(credentials=credentials)
-    except Exception as e:
-        logger.error(f"Failed to initialize Google Vision Client: {e}")
-        raise
-
-vision_client = get_vision_client()
+API_KEY = os.getenv("API_KEY", "your-default-api-key")  # Replace with your actual API key
 
 # Pydantic Models
 class Message(BaseModel):
     role: str
     content: str
 
+
+class ChatRequest(BaseModel):
+    model: str
+    messages: List[Message]
+    temperature: Optional[float] = 0.7
+
+
 class Choice(BaseModel):
     message: Message
+
 
 class ChatResponse(BaseModel):
     choices: List[Choice]
 
-# Function to Analyze Image
-def analyze_image(image: UploadFile) -> str:
-    """
-    Analyzes the uploaded image using Google Vision API and returns a description.
-    """
-    try:
-        contents = image.file.read()
-        image_content = vision.Image(content=contents)
-        response = vision_client.label_detection(image=image_content)
-        labels = response.label_annotations
-        if response.error.message:
-            raise Exception(response.error.message)
-        
-        # Create a description from labels
-        description = ", ".join([label.description for label in labels])
-        logger.info(f"Image analysis description: {description}")
-        return description
-    except Exception as e:
-        logger.error(f"Image analysis failed: {e}")
-        raise Exception(f"Image analysis failed: {str(e)}")
-    finally:
-        image.file.close()
 
 # Function to Generate Response
-def generate_response(description: str, event: str, zip_code: str, month: str) -> str:
+def generate_response(user_input: str, session_id: Optional[str] = None) -> str:
     """
-    Calls the GPT model API with the image description and event details.
+    Calls the GPT model API hosted at your specified endpoint.
     """
     gpt_api_url = "https://mmotwapi.onrender.com/chat"  # Replace with your FastAPI Render URL
     headers = {"x-api-key": API_KEY, "Content-Type": "application/json"}
-    
-    prompt = (
-        f"Event: {event}\n"
-        f"Zip Code: {zip_code}\n"
-        f"Month: {month}\n"
-        f"Image Description: {description}\n\n"
-        "Please analyze the image and provide a grade from A to F based on suitability for the event. "
-        "Include reasons for the grade and recommendations to improve to an A."
-    )
-    
     payload = {
         "model": "gpt-4",
         "messages": [
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": user_input}
         ],
         "temperature": 0.7
     }
@@ -125,21 +81,14 @@ def generate_response(description: str, event: str, zip_code: str, month: str) -
         logger.info(f"Response from GPT API: {data}")
         return data.get("choices", [{}])[0].get("message", {}).get("content", "No response.")
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error calling GPT API: {e}")
         raise Exception(f"Error calling GPT API: {str(e)}")
+
 
 # API Endpoint
 @app.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(
-    x_api_key: str = Header(..., alias="x-api-key"),
-    image: UploadFile = File(...),
-    event: str = Form(...),
-    zip_code: str = Form(...),
-    month: str = Form(...)
-):
+def chat_endpoint(chat_request: ChatRequest, x_api_key: str = Header(..., alias="x-api-key")):
     """
-    Chat endpoint that processes user input including an image and event details,
-    then returns a response with a grade and recommendations.
+    Chat endpoint that processes user input and returns a response.
     Requires a valid API key in the 'x-api-key' header.
     """
     # Validate API Key
@@ -147,14 +96,19 @@ async def chat_endpoint(
         raise HTTPException(status_code=403, detail="Forbidden: Invalid API Key")
 
     try:
-        # Log the incoming request details (excluding the image for privacy)
-        logger.info(f"Received request: event={event}, zip_code={zip_code}, month={month}")
+        # Log the incoming request
+        logger.info(f"Received request: {chat_request.dict()}")
 
-        # Analyze the uploaded image
-        description = analyze_image(image)
+        # Extract user message from messages list
+        user_message = next(
+            (msg.content for msg in chat_request.messages if msg.role.lower() == "user"),
+            None
+        )
+        if not user_message:
+            raise HTTPException(status_code=400, detail="No user message found in the request.")
 
-        # Generate response using the image description and event details
-        response_text = generate_response(description, event, zip_code, month)
+        # Generate response using the provided user input
+        response_text = generate_response(user_message)
 
         # Construct the response
         response = ChatResponse(
@@ -171,8 +125,6 @@ async def chat_endpoint(
         logger.info(f"Generated response: {response}")
         return response
 
-    except HTTPException as he:
-        raise he
     except Exception as e:
         logger.error(f"Error in /chat endpoint: {e}")
-        raise HTTPException(status_code=500, detail=f"Server Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Server Error: {str(e)}")" and this is my render site "https://mmotwapi.onrender.com/chat
