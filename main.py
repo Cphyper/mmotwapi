@@ -2,8 +2,9 @@ from fastapi import FastAPI, HTTPException, Header, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import List
 import os
-import requests
+import base64
 import logging
+from playwright.sync_api import sync_playwright
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -16,7 +17,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Pydantic model for GPT response
+# Pydantic model for the final JSON response
 class Message(BaseModel):
     role: str
     content: str
@@ -28,8 +29,7 @@ class ChatResponse(BaseModel):
     choices: List[Choice]
 
 # Environment variables
-API_KEY = os.getenv("API_KEY", "16546sw60520e19st")  # GPT API Key
-GPT_API_URL = "https://mmotwapi.onrender.com/chat"
+API_KEY = os.getenv("API_KEY", "16546sw60520e19st")  # Replace with your actual API key
 
 # Endpoint to process uploaded image and form data
 @app.post("/chat", response_model=ChatResponse)
@@ -48,15 +48,12 @@ async def analyze_outfit(
         raise HTTPException(status_code=403, detail="Forbidden: Invalid API Key")
 
     try:
-        # Read the uploaded image
+        # Read and encode the uploaded image
         image_content = await image.read()
         logger.info(f"Received image: {image.filename}, event: {event}, zip: {zip_code}, month: {month}")
-
-        # Convert image to Base64
-        import base64
         image_base64 = base64.b64encode(image_content).decode("utf-8")
 
-        # Prepare the GPT prompt
+        # Generate prompt
         prompt = (
             f"Event: {event}\n"
             f"Zip Code: {zip_code}\n"
@@ -65,27 +62,45 @@ async def analyze_outfit(
             "Please analyze the outfit for the event, grade it from A to F, and provide improvement suggestions."
         )
 
-        # Call GPT API
-        headers = {"Content-Type": "application/json", "x-api-key": API_KEY}
-        payload = {
-            "model": "gpt-4",
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.7,
-        }
+        # Use Playwright to interact with the GPT instance
+        logger.info("Interacting with the custom GPT instance...")
+        response_text = interact_with_gpt_instance(prompt)
+        logger.info(f"Received response from GPT: {response_text}")
 
-        response = requests.post(GPT_API_URL, headers=headers, json=payload)
-        response.raise_for_status()
-
-        # Parse GPT API response
-        gpt_response = response.json()
-        logger.info(f"GPT API response: {gpt_response}")
-
-        # Return the response
+        # Format the response as JSON
         return ChatResponse(
             choices=[
-                Choice(message=Message(role="assistant", content=gpt_response.get("choices", [{}])[0].get("message", {}).get("content", "No response.")))
+                Choice(message=Message(role="assistant", content=response_text))
             ]
         )
     except Exception as e:
         logger.error(f"Error processing request: {e}")
         raise HTTPException(status_code=500, detail="Server error occurred.")
+
+def interact_with_gpt_instance(prompt: str) -> str:
+    """
+    Use Playwright to send a prompt to the GPT instance and retrieve the response.
+    """
+    gpt_url = "https://chatgpt.com/g/g-674ca726c78c8191a3ca4baede9712a6-dress-to-impress"
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+
+            # Go to the GPT instance
+            page.goto(gpt_url)
+
+            # Interact with the page (adjust selectors based on the page's structure)
+            logger.info("Entering the prompt into the GPT interface...")
+            page.fill("textarea", prompt)  # Replace "textarea" with the correct selector for the input field
+            page.click("button[type='submit']")  # Replace with the correct selector for the submit button
+
+            # Wait for the response
+            page.wait_for_selector(".response-container")  # Adjust based on the page's response element
+            response_text = page.query_selector(".response-container").inner_text()  # Adjust based on the response container
+
+            browser.close()
+            return response_text
+    except Exception as e:
+        logger.error(f"Error interacting with GPT instance: {e}")
+        raise HTTPException(status_code=500, detail="Failed to interact with GPT instance.")
