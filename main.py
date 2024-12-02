@@ -1,37 +1,40 @@
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Request
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import List, Optional
+import requests
+import os
 
-app = FastAPI(
-    title="Custom ChatGPT API",
-    description="A FastAPI application that mimics ChatGPT functionality.",
-    version="1.0.0",
-)
+app = FastAPI()
 
-# Existing POST Endpoint
+# Load API key from environment variable or configuration
+API_KEY = os.getenv("API_KEY", "16546sw60520e19st")
+
+class Message(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    model: str
+    messages: List[Message]
+    temperature: Optional[float] = 0.7
+
 @app.post("/chat")
-def chat_endpoint():
-    """
-    This is your existing POST endpoint for processing chat requests.
-    """
-    return {"detail": "Processing POST requests only."}
+async def chat_endpoint(chat_request: ChatRequest, x_api_key: str = Header(..., alias="x-api-key")):
+    # Validate API key
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid API Key")
 
-# New GET Endpoint
-@app.get("/chat")
-def chat_info():
-    """
-    Provides helpful information for GET requests.
-    """
-    return {
-        "message": "This is the Dress to Impress Grader API.",
-        "instructions": "Use a POST request with appropriate JSON payload and API key.",
-        "example_payload": {
-            "model": "gpt-4",
-            "messages": [{"role": "user", "content": "Describe the outfit"}],
-            "temperature": 0.7
-        },
-        "example_headers": {
-            "Content-Type": "application/json",
-            "x-api-key": "your-api-key"
-        }
+    # Call the GPT-4 API or process the request (this is a mock example)
+    gpt_api_url = "https://api.openai.com/v1/chat/completions"  # Replace with your GPT API endpoint
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
     }
+    payload = chat_request.dict()
+
+    try:
+        response = requests.post(gpt_api_url, headers=headers, json=payload)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Error calling GPT API: {str(e)}")
