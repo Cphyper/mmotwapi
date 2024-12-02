@@ -2,9 +2,9 @@ from fastapi import FastAPI, HTTPException, Header, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import List
 import os
-import base64
 import logging
-from playwright.sync_api import sync_playwright
+import base64
+from playwright.async_api import async_playwright
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -17,7 +17,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Pydantic model for the final JSON response
+# Pydantic model for GPT response
 class Message(BaseModel):
     role: str
     content: str
@@ -31,7 +31,6 @@ class ChatResponse(BaseModel):
 # Environment variables
 API_KEY = os.getenv("API_KEY", "16546sw60520e19st")  # Replace with your actual API key
 
-# Endpoint to process uploaded image and form data
 @app.post("/chat", response_model=ChatResponse)
 async def analyze_outfit(
     image: UploadFile = File(...),
@@ -45,15 +44,26 @@ async def analyze_outfit(
     """
     # Validate API Key
     if x_api_key != API_KEY:
+        logger.error("Invalid API Key")
         raise HTTPException(status_code=403, detail="Forbidden: Invalid API Key")
 
     try:
-        # Read and encode the uploaded image
+        # Log step: Reading uploaded image
+        logger.info("Reading uploaded image...")
         image_content = await image.read()
-        logger.info(f"Received image: {image.filename}, event: {event}, zip: {zip_code}, month: {month}")
-        image_base64 = base64.b64encode(image_content).decode("utf-8")
+        if not image_content:
+            logger.error("Uploaded image is empty")
+            raise HTTPException(status_code=400, detail="Uploaded image is empty")
 
-        # Generate prompt
+        logger.info(f"Received image: {image.filename} (size: {len(image_content)} bytes)")
+
+        # Convert image to Base64
+        logger.info("Encoding image to Base64...")
+        image_base64 = base64.b64encode(image_content).decode("utf-8")
+        logger.info(f"Image encoded successfully. Truncated data: {image_base64[:50]}")
+
+        # Prepare GPT prompt
+        logger.info("Preparing GPT prompt...")
         prompt = (
             f"Event: {event}\n"
             f"Zip Code: {zip_code}\n"
@@ -62,12 +72,12 @@ async def analyze_outfit(
             "Please analyze the outfit for the event, grade it from A to F, and provide improvement suggestions."
         )
 
-        # Use Playwright to interact with the GPT instance
-        logger.info("Interacting with the custom GPT instance...")
-        response_text = interact_with_gpt_instance(prompt)
+        # Call the GPT instance via Playwright
+        logger.info("Interacting with GPT instance via Playwright...")
+        response_text = await interact_with_gpt_instance(prompt)
         logger.info(f"Received response from GPT: {response_text}")
 
-        # Format the response as JSON
+        # Return the response
         return ChatResponse(
             choices=[
                 Choice(message=Message(role="assistant", content=response_text))
@@ -77,29 +87,28 @@ async def analyze_outfit(
         logger.error(f"Error processing request: {e}")
         raise HTTPException(status_code=500, detail="Server error occurred.")
 
-def interact_with_gpt_instance(prompt: str) -> str:
+async def interact_with_gpt_instance(prompt: str) -> str:
     """
-    Use Playwright to send a prompt to the GPT instance and retrieve the response.
+    Use Playwright to send a prompt to the GPT instance and retrieve the response asynchronously.
     """
     gpt_url = "https://chatgpt.com/g/g-674ca726c78c8191a3ca4baede9712a6-dress-to-impress"
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
 
-            # Go to the GPT instance
-            page.goto(gpt_url)
+            # Navigate to the GPT instance
+            await page.goto(gpt_url)
 
             # Interact with the page (adjust selectors based on the page's structure)
-            logger.info("Entering the prompt into the GPT interface...")
-            page.fill("textarea", prompt)  # Replace "textarea" with the correct selector for the input field
-            page.click("button[type='submit']")  # Replace with the correct selector for the submit button
+            await page.fill("textarea", prompt)  # Replace with the correct selector for the input field
+            await page.click("button[type='submit']")  # Replace with the correct selector for the submit button
 
             # Wait for the response
-            page.wait_for_selector(".response-container")  # Adjust based on the page's response element
-            response_text = page.query_selector(".response-container").inner_text()  # Adjust based on the response container
+            await page.wait_for_selector(".response-container")  # Adjust based on the page's response element
+            response_text = await page.query_selector(".response-container").inner_text()  # Adjust based on the response container
 
-            browser.close()
+            await browser.close()
             return response_text
     except Exception as e:
         logger.error(f"Error interacting with GPT instance: {e}")
