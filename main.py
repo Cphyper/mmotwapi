@@ -28,8 +28,8 @@ class ChatResponse(BaseModel):
     choices: List[Choice]
 
 # Environment variables
-API_KEY = os.getenv("API_KEY", "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")  # GPT API Key
-GPT_API_URL = "https://chatgpt.com/g/g-674ca726c78c8191a3ca4baede9712a6-dress-to-impress"
+API_KEY = os.getenv("API_KEY", "16546sw60520e19st")  # GPT API Key
+GPT_API_URL = "https://mmotwapi.onrender.com/chat"
 
 # Endpoint to process uploaded image and form data
 @app.post("/chat", response_model=ChatResponse)
