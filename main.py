@@ -92,9 +92,15 @@ async def interact_with_gpt_instance(prompt: str) -> str:
     Use Playwright to send a prompt to the GPT instance and retrieve the response asynchronously.
     """
     gpt_url = "https://chatgpt.com/g/g-674ca726c78c8191a3ca4baede9712a6-dress-to-impress"
+    playwright_path = "/opt/render/.cache/ms-playwright/chromium_headless_shell-1148/chrome-linux/headless_shell"
+
     try:
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
+            # Launch the browser with the specified executable path
+            browser = await p.chromium.launch(
+                executable_path=playwright_path,  # Explicit path to headless_shell
+                headless=True
+            )
             page = await browser.new_page()
 
             # Navigate to the GPT instance
